@@ -3,6 +3,8 @@
 import { useSearchParams } from "next/navigation";
 import MetadataForm from "@/components/MetadataForm";
 
+export const dynamic = "force-dynamic"; // ✅ эта строка предотвращает SSR
+
 export default function EditPage() {
   const params = useSearchParams();
 
