@@ -1,77 +1,85 @@
+// components/MetadataForm.tsx
 "use client";
 
 import { useState } from "react";
-import { saveMetadata } from "@/lib/api";
+import { fetchAPI, ApiResponse, ApiRequestData } from "@/lib/api";
 
-interface Props {
+interface MetadataFormProps {
   trackId: string;
   chatId: string;
 }
 
-export default function MetadataForm({ trackId, chatId }: Props) {
-  const [form, setForm] = useState({
-    title: "",
-    artist: "",
-    album: "",
-    year: "",
-    genre: "",
-    coverUrl: "",
-  });
-
+export default function MetadataForm({ trackId, chatId }: MetadataFormProps) {
+  const [title, setTitle] = useState("");
+  const [artist, setArtist] = useState("");
+  const [coverFile, setCoverFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setMessage(null);
 
-    await saveMetadata(trackId, chatId, form);
+    // Конвертируем файл в Base64
+    let coverBase64: string | undefined;
+    if (coverFile) {
+      coverBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(coverFile);
+      });
+      // Убираем префикс data:image/jpeg;base64,
+      coverBase64 = coverBase64.split(",")[1];
+    }
+
+    const data: ApiRequestData = {
+      trackId,
+      chatId,
+      metadata: {
+        title,
+        artist,
+      },
+      coverBase64,
+    };
+
+    const res: ApiResponse = await fetchAPI("saveMetadata", data);
+
+    if (res.success) {
+      setMessage("✅ Метаданные успешно сохранены!");
+    } else {
+      setMessage(`❌ Ошибка: ${res.error}`);
+    }
 
     setLoading(false);
-    alert("✅ Метаданные сохранены и отправлены в Telegram!");
-  }
+  };
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
+    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <input
         type="text"
-        placeholder="Название"
-        value={form.title}
-        onChange={(e) => setForm({ ...form, title: e.target.value })}
+        placeholder="Название трека"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        required
       />
       <input
         type="text"
-        placeholder="Артист"
-        value={form.artist}
-        onChange={(e) => setForm({ ...form, artist: e.target.value })}
+        placeholder="Исполнитель"
+        value={artist}
+        onChange={(e) => setArtist(e.target.value)}
+        required
       />
       <input
-        type="text"
-        placeholder="Альбом"
-        value={form.album}
-        onChange={(e) => setForm({ ...form, album: e.target.value })}
+        type="file"
+        accept="image/*"
+        onChange={(e) => setCoverFile(e.target.files ? e.target.files[0] : null)}
       />
-      <input
-        type="text"
-        placeholder="Год"
-        value={form.year}
-        onChange={(e) => setForm({ ...form, year: e.target.value })}
-      />
-      <input
-        type="text"
-        placeholder="Жанр"
-        value={form.genre}
-        onChange={(e) => setForm({ ...form, genre: e.target.value })}
-      />
-      <input
-        type="text"
-        placeholder="URL обложки"
-        value={form.coverUrl}
-        onChange={(e) => setForm({ ...form, coverUrl: e.target.value })}
-      />
-
       <button type="submit" disabled={loading}>
-        {loading ? "Сохраняем..." : "💾 Сохранить"}
+        {loading ? "Сохраняем..." : "Сохранить"}
       </button>
+      {message && <p>{message}</p>}
     </form>
   );
 }
